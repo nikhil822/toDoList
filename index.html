@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To Do List</title>
+</head>
+<body>
+    <h1>To-Do List</h1>
+    <h2>Create a task</h2>
+    <form id="create-task-form">
+        <label>Title</label>
+        <input type="text" id="title-input" required>
+        <label>Priority (1- 9)</label>
+        <input type="number" id="priority-input" min="1" max="9" required>
+        <button type="submit">Create</button>
+    </form>
+    <h2>List of tasks</h2>
+    <ul id="task-list"></ul>
+
+    <h2>Report of tasks</h2>
+    <div id="report"></div>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script>
+        const taskList = document.getElementById('task-list');
+        const createTaskForm = document.getElementById('create-task-form');
+        const titleInput = document.getElementById('title-input');
+        const priorityInput = document.getElementById('priority-input');
+        const reportDiv = document.getElementById('report');
+
+        // Create a new task
+        createTaskForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            axios.post('http://localhost:5000/api/tasks', {
+                title: titleInput.value,
+                priority: priorityInput.value
+            })
+            .then((response) => {
+                const task = response.data;
+                const taskListItem = document.createElement('li');
+                taskListItem.innerHTML = `${task.title} (${task.priority}) [<a href="#" class="complete-link">-</a> <a href="#" class="cancel-link">x</a> <a href="#" class="delete-link">delete</a>]`;
+                taskListItem.setAttribute('data-id', task._id);
+                taskList.appendChild(taskListItem);
+
+                updateReport();
+            })
+            .catch((error) => {
+                console.log(error);
+            })
+        })
+
+        // Mark task as completed
+        taskList.addEventListener('click', (event) => {
+            if(event.target.classList.contains('complete-link')) {
+                const taskId = event.target.parentNode.getAttribute('data-id');
+                axios.patch(`http://localhost:5000/api/tasks/${taskId}/complete`)
+                .then((response) => {
+                    const task = response.data;
+                    const taskListItem = taskList.querySelector(`[data-id="${task._id}"]`);
+                    taskListItem.innerHTML = `${task.title} (${task.priority}) [✔completed <a href="#" class="cancel-link">x</a> <a href="#" class="delete-link">delete</a>]`;
+                    updateReport();
+                })
+                .catch((error) => {
+                    console.log(error);
+                })
+            }
+        })
+
+        // Mark task as canceled
+        taskList.addEventListener('click', (event) => {
+            if(event.target.classList.contains('cancel-link')) {
+                const taskId = event.target.parentNode.getAttribute('data-id');
+                axios.patch(`http://localhost:5000/api/tasks/${taskId}/cancel`)
+                .then((response) => {
+                    const task = response.data;
+                    const taskListItem = taskList.querySelector(`[data-id="${task._id}"]`);
+                    taskListItem.innerHTML = `${task.title} (${task.priority}) [✘ <a href="#" class="complete-link">-</a> ✖ <a href="#" class="delete-link">delete</a>]`;
+                    updateReport();
+                })
+                .catch((error) => {
+                    console.log(error);
+                })
+            }
+        })
+
+        // Delete task
+        taskList.addEventListener('click', (event) => {
+            if(event.target.classList.contains('delete-link')) {
+                const taskId = event.target.parentNode.getAttribute('data-id');
+                axios.delete(`http://localhost:5000/api/tasks/${taskId}`)
+                .then((response) => {
+                    const task = response.data;
+                    const taskListItem = taskList.querySelector(`[data-id="${task._id}"]`);
+                    taskListItem.remove();
+                    updateReport();
+                })
+                .catch((error) => {
+                    console.log(error);
+                })
+            }
+        })
+
+        function updateReport() {
+            axios.get('http://localhost:5000/api/tasks')
+            .then((response) => {
+                const tasks = response.data;
+                const total = tasks.length;
+                const completed = tasks.filter((task) => task.completed).length;
+                const canceled = tasks.filter((task) => task.canceled).length;
+                reportDiv.innerHTML = `Total: ${total}, Completed: ${completed}, Canceled: ${canceled}`;
+
+                const taskListItems = taskList.querySelectorAll('li');
+                taskListItems.forEach((taskListItem) => {
+                    const status = getStatus(taskListItem)
+                    taskList.removeChild(taskListItem);
+                    taskList.appendChild(taskListItem);
+                })
+            })
+            .catch((error) => {
+                console.log(error);
+            })
+        }
+
+        // get status
+        function getStatus(taskListItem) {
+            const taskListItemHTML = taskListItem.innerHTML;
+            if(taskListItemHTML.includes('✔')) {
+                return 'completed';
+            } else if(taskListItemHTML.includes('✘')) {
+                return 'canceled';
+            } else {
+                return 'pending';
+            }
+        }
+    </script>
+</body>
+</html>
